@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>كاشير احترافي</title>
+
+<style>
+body{font-family:Arial;direction:rtl;background:#eef3ef;margin:0;padding:10px}
+.card{background:#fff;border-radius:20px;padding:15px}
+
+.save-btn{background:#2e7d32;color:#fff;padding:10px;border:none;border-radius:20px;margin-bottom:10px}
+
+.top{background:#f6e7c9;padding:10px;border-radius:15px;display:flex;gap:10px}
+input{flex:1;padding:10px;border-radius:20px;border:none}
+
+.sections{display:flex;gap:10px;margin-top:10px}
+.box{background:#fafafa;border-radius:15px;padding:10px;width:50%}
+
+.item{background:#fff;padding:8px;margin-top:5px;border-radius:10px;display:flex;justify-content:space-between}
+.delete{color:red;cursor:pointer}
+
+/* جدول */
+table{width:100%;border-collapse:collapse;margin-top:5px}
+th,td{border:1px solid #ddd;padding:5px;text-align:center}
+th{background:#f2e3c5}
+
+.total{margin-top:10px;background:#f2e3c5;padding:10px;border-radius:10px;font-weight:bold}
+
+/* معلومات الزبون */
+.customer-info input{
+width:100%;
+margin-top:5px;
+padding:10px;
+border-radius:15px;
+border:none;
+font-size:14px;
+}
+
+#custAddress{background:#fff3cd}
+#custPhone{background:#d1ecf1}
+
+/* أزرار */
+.buttons button{width:100%;margin-top:5px;padding:10px;border:none;border-radius:20px;color:#fff}
+.print{background:#d9822b}
+.clear{background:red}
+.expense{background:#1aa3a3}
+.admin{background:#6a1b9a}
+
+/* popup */
+.popup{position:fixed;top:0;left:0;right:0;bottom:0;background:#0005;display:none;justify-content:center;align-items:center}
+.popup-box{background:#fff;padding:20px;border-radius:15px;text-align:center}
+.popup-box input{width:60px;text-align:center}
+
+/* شاشة */
+.screen{position:fixed;top:0;left:0;right:0;bottom:0;background:#fff;padding:10px;display:none;overflow:auto}
+</style>
+
+</head>
+
+<body>
+
+<div class="card">
+
+<button class="save-btn" onclick="addItem()">حفظ المادة</button>
+
+<div class="top">
+<input id="itemPrice" placeholder="السعر">
+<input id="itemName" placeholder="اسم المادة">
+</div>
+
+<div class="sections">
+
+<!-- الاصناف -->
+<div class="box">
+<h3>الأصناف</h3>
+<div id="items"></div>
+</div>
+
+<!-- الفاتورة -->
+<div class="box">
+<h3>فاتورة الطلب</h3>
+
+<table>
+<thead>
+<tr>
+<th>المادة</th>
+<th>العدد</th>
+<th>سعر الوحدة</th>
+<th>الإجمالي</th>
+</tr>
+</thead>
+<tbody id="bill"></tbody>
+</table>
+
+<div class="total">المجموع: <span id="total">0</span></div>
+
+<!-- معلومات الزبون -->
+<div class="customer-info">
+<input id="custAddress" placeholder="اكتب عنوان الزبون">
+<input id="custPhone" placeholder="اكتب رقم هاتف الزبون">
+</div>
+
+<div class="buttons">
+<button class="print" onclick="printBill()">طباعة</button>
+<button class="clear" onclick="clearBill()">مسح الفاتورة</button>
+<button class="expense" onclick="openExpense()">المصروفات</button>
+<button class="admin" onclick="openAdmin()">المسؤول</button>
+</div>
+
+</div>
+
+</div>
+</div>
+
+<!-- popup -->
+<div class="popup" id="popup">
+<div class="popup-box">
+<h3 id="pname"></h3>
+<button onclick="changeQty(-1)">-</button>
+<input id="qty" value="1">
+<button onclick="changeQty(1)">+</button>
+<br><br>
+<button onclick="addToBill()">تم</button>
+</div>
+</div>
+
+<!-- المصروفات -->
+<div class="screen" id="expenseScreen">
+<h3>المصروفات</h3>
+<input id="exName" placeholder="المشتريات">
+<input id="exPrice" placeholder="السعر">
+<button onclick="addExpense()">إضافة</button>
+
+<div id="expList"></div>
+<h4>المجموع: <span id="expTotal">0</span></h4>
+
+<button onclick="clearExpenses()">حذف الصرفيات</button>
+<button onclick="closeScreen()">رجوع</button>
+</div>
+
+<!-- المسؤول -->
+<div class="screen" id="adminScreen">
+<h3>الطلبات</h3>
+<div id="ordersList"></div>
+
+<h3>المصروفات</h3>
+<div id="adminExp"></div>
+
+<button onclick="clearAll()">حذف الكل</button>
+<button onclick="closeScreen()">رجوع</button>
+</div>
+
+<script>
+
+let items=JSON.parse(localStorage.items||"[]")
+let bill=[]
+let expenses=JSON.parse(localStorage.expenses||"[]")
+let orders=JSON.parse(localStorage.orders||"[]")
+
+function render(){
+let div=document.getElementById("items")
+div.innerHTML=""
+items.forEach((e,i)=>{
+div.innerHTML+=`
+<div class="item" onclick="selectItem(${i})">
+<span>${e.name} - ${e.price}</span>
+<span class="delete" onclick="event.stopPropagation();delItem(${i})">-</span>
+</div>`
+})
+localStorage.items=JSON.stringify(items)
+}
+
+function addItem(){
+let name=itemName.value
+let price=itemPrice.value
+if(!name||!price)return alert("املأ الحقول")
+
+items.push({name,price:+price})
+render()
+itemName.value=""
+itemPrice.value=""
+}
+
+function delItem(i){items.splice(i,1);render()}
+
+/* popup */
+let current
+function selectItem(i){
+current=items[i]
+popup.style.display="flex"
+pname.innerText=current.name
+qty.value=1
+}
+
+function changeQty(n){
+qty.value=Math.max(1,parseInt(qty.value)+n)
+}
+
+function addToBill(){
+let q=+qty.value
+let total=q*current.price
+bill.push({name:current.name,qty:q,price:current.price,total})
+popup.style.display="none"
+renderBill()
+}
+
+function renderBill(){
+let div=bill
+let table=document.getElementById("bill")
+table.innerHTML=""
+let sum=0
+
+bill.forEach(b=>{
+table.innerHTML+=`
+<tr>
+<td>${b.name}</td>
+<td>${b.qty}</td>
+<td>${b.price}</td>
+<td>${b.total}</td>
+</tr>`
+sum+=b.total
+})
+
+total.innerText=sum
+}
+
+function clearBill(){
+bill=[]
+renderBill()
+}
+
+/* 🔥 الطباعة الجديدة */
+function printBill(){
+
+let address=custAddress.value
+let phone=custPhone.value
+
+if(!address||!phone){
+alert("اكتب عنوان ورقم الزبون")
+return
+}
+
+let totalValue=total.innerText
+
+let content=`
+<html dir="rtl">
+<head>
+<style>
+body{font-family:Arial;text-align:center;padding:20px}
+table{width:100%;border-collapse:collapse}
+th,td{border:1px solid #000;padding:8px}
+th{background:#eee}
+</style>
+</head>
+<body>
+
+<h2>فاتورة الطلب</h2>
+
+<table>
+<tr>
+<th>المادة</th>
+<th>العدد</th>
+<th>السعر</th>
+<th>الإجمالي</th>
+</tr>
+`
+
+bill.forEach(b=>{
+content+=`
+<tr>
+<td>${b.name}</td>
+<td>${b.qty}</td>
+<td>${b.price}</td>
+<td>${b.total}</td>
+</tr>`
+})
+
+content+=`
+</table>
+
+<h3>المجموع: ${totalValue}</h3>
+
+<p>📍 ${address}</p>
+<p>📞 ${phone}</p>
+
+</body>
+</html>
+`
+
+let w=window.open('')
+w.document.write(content)
+w.print()
+
+orders.push({items:bill,address,phone,total:totalValue})
+localStorage.orders=JSON.stringify(orders)
+}
+
+/* مصروفات */
+function openExpense(){
+expenseScreen.style.display="block"
+renderExp()
+}
+
+function addExpense(){
+let n=exName.value
+let p=exPrice.value
+if(!n||!p)return
+
+expenses.push({n,p:+p})
+localStorage.expenses=JSON.stringify(expenses)
+renderExp()
+}
+
+function renderExp(){
+expList.innerHTML=""
+let sum=0
+
+expenses.forEach(e=>{
+expList.innerHTML+=`<div>${e.n} - ${e.p}</div>`
+sum+=e.p
+})
+
+expTotal.innerText=sum
+}
+
+function clearExpenses(){
+expenses=[]
+localStorage.expenses="[]"
+renderExp()
+}
+
+/* المسؤول */
+function openAdmin(){
+let pass=prompt("ادخل الرمز")
+if(pass!="55555")return alert("خطأ")
+
+adminScreen.style.display="block"
+
+let html="<table><tr><th>رقم</th><th>تفاصيل</th></tr>"
+
+orders.forEach((o,i)=>{
+html+=`<tr><td>${i+1}</td><td>`
+o.items.forEach(it=>{
+html+=`${it.name} × ${it.qty} = ${it.total}<br>`
+})
+html+=`📍 ${o.address}<br>📞 ${o.phone}</td></tr>`
+})
+
+html+="</table>"
+ordersList.innerHTML=html
+}
+
+function clearAll(){
+orders=[]
+expenses=[]
+localStorage.orders="[]"
+localStorage.expenses="[]"
+alert("تم حذف الكل")
+}
+
+function closeScreen(){
+expenseScreen.style.display="none"
+adminScreen.style.display="none"
+}
+
+render()
+
+</script>
+
+</body>
+</html>
